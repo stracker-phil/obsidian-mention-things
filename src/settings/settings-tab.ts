@@ -1,7 +1,8 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import { AvailableSigns } from '../types';
 import { ALLOWED_SIGNS } from '../constants';
 import MentionThingsPlugin from '../main';
+import { generateLinkPreview } from '../mention/link-utils';
+import { AvailableSigns, AvailableTypes } from '../types';
 
 /**
  * Settings tab for the Mention Things plugin
@@ -62,6 +63,9 @@ export class SettingsTab extends PluginSettingTab {
 	private renderMentionTypeRow(containerEl: HTMLElement, value: any, index: number, usedSigns: string[]): void {
 		const setting = new Setting(containerEl);
 		const availableSigns = this.getAvailableSigns(usedSigns, value?.sign);
+		const availableTypes = this.getAvailableTypes();
+
+		setting.setClass('mention-type-row');
 
 		// Sign dropdown
 		setting.addDropdown(
@@ -83,9 +87,32 @@ export class SettingsTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.mentionTypes[index].label = value;
 					await this.plugin.saveSettings();
+					updatePreview();
 				})
-				.inputEl.addClass('type_label'),
+				.inputEl.addClass('type-label'),
 		);
+
+		// Link style dropdown
+		setting.addDropdown(
+			list => list
+				.addOptions(availableTypes)
+				.setValue(value?.type || 'link')
+				.onChange(async (value) => {
+					this.plugin.settings.mentionTypes[index].type = value;
+					await this.plugin.saveSettings();
+					this.display();
+				}),
+		);
+
+		const updatePreview = (): void => {
+			const label = value.label || 'Name';
+			preview.classList.add('type-preview');
+			preview.innerText = generateLinkPreview(this.app, value.type, value.sign, label);
+		};
+
+		const preview = setting.controlEl.createSpan();
+		setting.controlEl.append(preview);
+		updatePreview();
 
 		// Delete button
 		setting.addExtraButton(
@@ -146,8 +173,7 @@ export class SettingsTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.stopCharacters ?? '?!"\'`:;/#+*=&%$§<>')
 					.onChange(async (value) => {
 						// Sanitize: remove duplicate characters
-						const uniqueChars = [...new Set(value.split(''))].join('');
-						this.plugin.settings.stopCharacters = uniqueChars;
+						this.plugin.settings.stopCharacters = [...new Set(value.split(''))].join('');
 						await this.plugin.saveSettings();
 					});
 			});
@@ -169,5 +195,14 @@ export class SettingsTab extends PluginSettingTab {
 		});
 
 		return availableSigns;
+	}
+
+	private getAvailableTypes(): AvailableTypes {
+		const availableTypes: AvailableTypes = {};
+
+		availableTypes.text = 'As Text';
+		availableTypes.link = 'As Link';
+
+		return availableTypes;
 	}
 }

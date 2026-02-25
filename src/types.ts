@@ -14,6 +14,7 @@ export interface MentionSettings {
  * Represents a type of mention with its sign and label
  */
 export interface MentionType {
+	type?: string;
 	sign?: string;
 	label?: string;
 }
@@ -43,6 +44,10 @@ export interface AvailableSigns {
 	[sign: string]: string;
 }
 
+export interface AvailableTypes {
+	[type: string]: string;
+}
+
 /**
  * Suggestion item structure
  */
@@ -50,6 +55,7 @@ export interface MentionSuggestion {
 	suggestionType: 'set' | 'create';
 	displayText: string;
 	linkName: string;
+	path: string;
 	context: any;
 }
 

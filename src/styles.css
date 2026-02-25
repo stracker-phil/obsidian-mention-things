@@ -1,3 +1,20 @@
-.mention-type-row .type-label {
-	flex: 1 1 auto;
+.mention-type-row {
+	--preview-width: 20ch;
+
+	.type-label {
+		flex: 1 1 auto;
+	}
+
+	.type-preview {
+		display: inline-block;
+		min-width: var(--preview-width);
+		max-width: var(--preview-width);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+
+		text-align: left;
+		font-size: 12px;
+		opacity: 0.7;
+	}
 }

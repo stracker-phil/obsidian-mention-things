@@ -7,7 +7,7 @@ import { getLinkFromPath } from './link-utils';
  */
 export class FileIndexer {
 	private app: App;
-	private settings: MentionSettings;
+	private readonly settings: MentionSettings;
 	private fileMaps: FileMaps = {};
 
 	constructor(app: App, settings: MentionSettings) {
@@ -26,11 +26,14 @@ export class FileIndexer {
 
 		// Process each file
 		files.forEach(file => {
-			if (file instanceof TFile && file.extension === 'md') {
-				const mentionLink = getLinkFromPath(file.path, this.settings);
-				if (mentionLink) {
-					this.addFileToMap(mentionLink);
-				}
+			if (! (file instanceof TFile) || file.extension !== 'md') {
+				return;
+			}
+
+			const mentionLink = getLinkFromPath(file.path, this.settings);
+
+			if (mentionLink) {
+				this.addFileToMap(mentionLink);
 			}
 		});
 

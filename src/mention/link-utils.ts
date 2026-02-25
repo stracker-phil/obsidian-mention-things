@@ -1,3 +1,4 @@
+import { App, TFile } from 'obsidian';
 import { MentionSettings, MentionType, MentionLink } from '../types';
 
 /**
@@ -11,6 +12,11 @@ export function getLinkFromPath(path: string, settings: MentionSettings): Mentio
 		return null;
 	}
 
+	const basename = path.split('/')?.pop()?.replace(/\.[^.]+$/, '');
+	if (!basename) {
+		return null;
+	}
+
 	for (let i = 0; i < settings.mentionTypes.length; i++) {
 		const type = settings.mentionTypes[i];
 
@@ -18,20 +24,15 @@ export function getLinkFromPath(path: string, settings: MentionSettings): Mentio
 			continue;
 		}
 
-		if (!path.includes('/' + type.sign)) {
+		if (!basename.startsWith(type.sign)) {
 			continue;
 		}
 
-		const regex = new RegExp(`/${type.sign}([^/]+)\\.md$`);
-		let result = regex.exec(path);
-
-		if (result?.[1]) {
-			return {
-				sign: type.sign,
-				name: result[1],
-				path,
-			};
-		}
+		return {
+			sign: type.sign,
+			name: basename.slice(type.sign.length).trim(),
+			path,
+		};
 	}
 
 	return null;
@@ -55,10 +56,40 @@ export function getTypeDef(types: MentionType[], sign: string): MentionType | nu
 
 /**
  * Create a link string for a mention
+ * @param app
+ * @param sourcePath The file with receives the link
+ * @param linkTo Path to the linked file
  * @param sign The mention sign
  * @param name The name to link to
+ * @param type Insertion type (link or text)
  * @returns Formatted link string
  */
-export function createMentionLink(sign: string, name: string): string {
-	return `[[${sign}${name}]]`;
+export function createMentionString(app: App, sourcePath: string, linkTo: string, sign: string, name: string, type: string): string {
+	const basename = `${sign}${name}`;
+
+	if ('text' === type) {
+		return basename;
+	}
+
+	const file = app.vault.getAbstractFileByPath(linkTo);
+
+	if (!(file instanceof TFile)) {
+		return basename;
+	}
+
+	return app.fileManager.generateMarkdownLink(file, sourcePath, '', basename);
+}
+
+export function generateLinkPreview(app: App, type: string, prefix: string, text: string): string {
+	const useMarkdownLinks = (app.vault as any).getConfig('useMarkdownLinks');
+
+	if ('text' === type) {
+		return text;
+	}
+	const link = encodeURIComponent(text);
+	const label = prefix + text;
+
+	return useMarkdownLinks
+		? `[${label}](${prefix}${link})`
+		: `[[${label}]]`;
 }
