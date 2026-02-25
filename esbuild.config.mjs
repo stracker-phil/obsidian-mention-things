@@ -25,8 +25,8 @@ const copyFilesToDist = {
 
 			await fs.copy('manifest.json', path.join(distDir, 'manifest.json'));
 
-			if (await fs.pathExists('styles.css')) {
-				await fs.copy('styles.css', path.join(distDir, 'styles.css'));
+			if (await fs.pathExists('src/styles.css')) {
+				await fs.copy('src/styles.css', path.join(distDir, 'styles.css'));
 			}
 
 			if (await fs.pathExists('resources')) {
