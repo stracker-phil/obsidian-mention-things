@@ -1,6 +1,5 @@
 import { App, TFile } from 'obsidian';
 import { MentionSettings, FileMaps, MentionLink } from '../types';
-import { getLinkFromPath } from './link-utils';
 
 /**
  * Handles indexing and tracking mentionable files
@@ -16,6 +15,56 @@ export class FileIndexer {
 	}
 
 	/**
+	 * Extract aliases from a file's frontmatter
+	 */
+	private getFileAliases(file: TFile): string[] {
+		const cache = this.app.metadataCache.getFileCache(file);
+		const aliases = cache?.frontmatter?.aliases;
+
+		if (!aliases) {
+			return [];
+		}
+
+		// Handle both array and comma-separated string formats
+		if (Array.isArray(aliases)) {
+			return aliases.map(a => String(a).toLowerCase()).filter(Boolean);
+		}
+
+		if (typeof aliases === 'string') {
+			return aliases
+				.split(',')
+				.map(a => a.trim().toLowerCase())
+				.filter(Boolean);
+		}
+
+		return [];
+	}
+
+	/**
+	 * Check if a file is in the specified folder (or any subfolder)
+	 */
+	private isFileInFolder(filePath: string, folderPath: string): boolean {
+		const normalizedFolder = folderPath.replace(/\\/g, '/').replace(/\/$/, '') + '/';
+		const normalizedFile = filePath.replace(/\\/g, '/');
+		return normalizedFile.startsWith(normalizedFolder);
+	}
+
+	/**
+	 * Index a single file for a single mention type, adding filename and alias entries
+	 */
+	private indexFileForType(file: TFile, sign: string, displayName: string): void {
+		this.addFileToMap({ sign, name: displayName, path: file.path });
+
+		const aliases = this.getFileAliases(file);
+		for (const alias of aliases) {
+			if (alias.startsWith(sign)) {
+				const aliasWithoutSign = alias.slice(sign.length).trim();
+				this.addFileToMap({ sign, name: displayName, path: file.path, sourceAlias: alias }, aliasWithoutSign);
+			}
+		}
+	}
+
+	/**
 	 * Initialize the file index by scanning all files in the vault
 	 */
 	initialize(): FileMaps {
@@ -26,14 +75,25 @@ export class FileIndexer {
 
 		// Process each file
 		files.forEach(file => {
-			if (! (file instanceof TFile) || file.extension !== 'md') {
+			if (!(file instanceof TFile) || file.extension !== 'md') {
 				return;
 			}
 
-			const mentionLink = getLinkFromPath(file.path, this.settings);
+			for (const type of this.settings.mentionTypes) {
+				if (!type.sign) {
+					continue;
+				}
 
-			if (mentionLink) {
-				this.addFileToMap(mentionLink);
+				const basename = file.basename;
+				const inFolder = type.folder && this.isFileInFolder(file.path, type.folder);
+				const signMatch = !type.folder && basename.startsWith(type.sign);
+
+				if (!inFolder && !signMatch) {
+					continue;
+				}
+
+				const displayName = type.folder ? basename : basename.slice(type.sign.length).trim();
+				this.indexFileForType(file, type.sign, displayName);
 			}
 		});
 
@@ -54,18 +114,40 @@ export class FileIndexer {
 		let needsUpdate = false;
 
 		// Handle new or updated file
-		const addItem = getLinkFromPath(path, this.settings);
-		if (addItem) {
-			this.addFileToMap(addItem);
-			needsUpdate = true;
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (file instanceof TFile) {
+			for (const type of this.settings.mentionTypes) {
+				if (!type.sign) {
+					continue;
+				}
+
+				const basename = file.basename;
+				const inFolder = type.folder && this.isFileInFolder(file.path, type.folder);
+				const signMatch = !type.folder && basename.startsWith(type.sign);
+
+				if (!inFolder && !signMatch) {
+					continue;
+				}
+
+				const displayName = type.folder ? basename : basename.slice(type.sign.length).trim();
+				this.indexFileForType(file, type.sign, displayName);
+				needsUpdate = true;
+			}
 		}
 
-		// Handle renamed or deleted file
+		// Handle renamed or deleted file - remove all entries for this path
 		if (originalPath) {
-			const removeItem = getLinkFromPath(originalPath, this.settings);
-			if (removeItem) {
-				this.removeFileFromMap(removeItem);
-				needsUpdate = true;
+			for (const type of this.settings.mentionTypes) {
+				if (!type.sign || !this.fileMaps[type.sign]) {
+					continue;
+				}
+
+				for (const key in this.fileMaps[type.sign]) {
+					if (this.fileMaps[type.sign][key].path === originalPath) {
+						delete this.fileMaps[type.sign][key];
+						needsUpdate = true;
+					}
+				}
 			}
 		}
 
@@ -74,30 +156,18 @@ export class FileIndexer {
 
 	/**
 	 * Add a file to the appropriate map
+	 * @param item The mention link to add
+	 * @param searchKey Optional custom search key (for aliases). Defaults to item.name
 	 */
-	private addFileToMap(item: MentionLink): void {
+	private addFileToMap(item: MentionLink, searchKey?: string): void {
 		const sign = item.sign;
 
 		if (!sign) {
 			return;
 		}
 
-		const key = item.name.toLowerCase();
+		const key = (searchKey || item.name).toLowerCase();
 		this.fileMaps[sign] = this.fileMaps[sign] || {};
 		this.fileMaps[sign][key] = item;
-	}
-
-	/**
-	 * Remove a file from the map
-	 */
-	private removeFileFromMap(item: MentionLink): void {
-		const sign = item.sign;
-
-		if (!sign || !this.fileMaps[sign]) {
-			return;
-		}
-
-		const key = item.name.toLowerCase();
-		delete this.fileMaps[sign][key];
 	}
 }

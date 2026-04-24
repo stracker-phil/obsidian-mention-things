@@ -157,6 +157,7 @@ export class SuggestionProvider extends EditorSuggest<MentionSuggestion> {
 	 */
 	private getMatchingSuggestions(map: any, term: string, context: EditorSuggestContext): MentionSuggestion[] {
 		const suggestions: MentionSuggestion[] = [];
+		const seenPaths = new Set<string>();
 
 		for (let key in map) {
 			if (!key) {
@@ -167,11 +168,26 @@ export class SuggestionProvider extends EditorSuggest<MentionSuggestion> {
 				continue;
 			}
 
+			const item = map[key];
+			const isAliasMatch = !!item.sourceAlias;
+
+			// Create a unique key combining path and whether it's an alias match
+			// This allows showing both filename and alias matches, but prevents duplicate aliases
+			const uniqueKey = `${item.path}:${isAliasMatch ? item.sourceAlias : 'filename'}`;
+			
+			if (seenPaths.has(uniqueKey)) {
+				continue;
+			}
+			seenPaths.add(uniqueKey);
+
 			suggestions.push({
 				suggestionType: 'set',
-				displayText: map[key].name.trim(),
-				linkName: map[key].name,
-				path: map[key].path,
+				displayText: isAliasMatch 
+					? `${item.sourceAlias} → ${item.name}`
+					: item.name.trim(),
+				linkName: item.name,
+				path: item.path,
+				sourceAlias: item.sourceAlias,
 				context,
 			});
 		}
@@ -224,8 +240,16 @@ export class SuggestionProvider extends EditorSuggest<MentionSuggestion> {
 		}
 
 		const context = value.context;
-		console.log('Insert:', config, value)
-		const insertion = createMentionString(this.app, context.file.path, value.path, config.sign, value.linkName, config.type ?? 'link');
+		console.log('Insert:', config, value);
+		// Determine what to display in the link
+		let displayName = value.linkName;
+		if (value.sourceAlias) {
+			displayName = value.sourceAlias.startsWith(config.sign)
+				? value.sourceAlias.slice(config.sign.length).trim()
+				: value.sourceAlias;
+		}
+
+		const insertion = createMentionString(this.app, context.file.path, value.path, config.sign, displayName, config.type ?? 'link');
 		this.prevMention = value.linkName;
 
 		value.context.editor.replaceRange(

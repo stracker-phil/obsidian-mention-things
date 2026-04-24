@@ -3,6 +3,7 @@ import { ALLOWED_SIGNS } from '../constants';
 import MentionThingsPlugin from '../main';
 import { generateLinkPreview } from '../mention/link-utils';
 import { AvailableSigns, AvailableTypes } from '../types';
+import { FolderSuggest } from './folder-suggest-modal';
 
 /**
  * Settings tab for the Mention Things plugin
@@ -27,6 +28,9 @@ export class SettingsTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl).setName('Mention Things').setHeading();
+
+		new Setting(containerEl)
+			.setDesc('Configure mention types. Leave folder empty to scan entire vault for files starting with the sign. Set a folder to scan only that folder (no sign required in filename).');
 
 		// Render mention types section
 		this.renderMentionTypesSection(containerEl, usedSigns);
@@ -90,6 +94,24 @@ export class SettingsTab extends PluginSettingTab {
 					updatePreview();
 				})
 				.inputEl.addClass('type-label'),
+		);
+
+		// Folder text input with autocomplete
+		setting.addText(
+			text => {
+				text
+					.setPlaceholder('Folder (optional)')
+					.setValue(value?.folder || '');
+				
+				// Attach folder suggest to the input with callback for when folder is selected
+				new FolderSuggest(this.app, text.inputEl, async (folder) => {
+					this.plugin.settings.mentionTypes[index].folder = folder.path;
+					await this.plugin.saveSettings();
+					this.plugin.mentionManager.updateSettings(this.plugin.settings);
+				});
+				
+				text.inputEl.addClass('type-folder');
+			}
 		);
 
 		// Link style dropdown

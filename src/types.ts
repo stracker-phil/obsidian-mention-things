@@ -17,6 +17,7 @@ export interface MentionType {
 	type?: string;
 	sign?: string;
 	label?: string;
+	folder?: string;
 }
 
 /**
@@ -26,6 +27,7 @@ export interface MentionLink {
 	sign: string;
 	name: string;
 	path: string;
+	sourceAlias?: string;
 }
 
 /**
@@ -57,6 +59,7 @@ export interface MentionSuggestion {
 	linkName: string;
 	path: string;
 	context: any;
+	sourceAlias?: string;
 }
 
 /**
